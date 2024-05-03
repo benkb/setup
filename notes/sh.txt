@@ -1,0 +1,15 @@
+# Bashnotes
+
+
+## Get dirname from script
+
+```
+dirname "$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
+```
+
+
+## basename throug variable expansion
+
+
+p='/usr/local/pup'
+echo "${p##*}"

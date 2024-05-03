@@ -1,0 +1,58 @@
+# ~/.profile: 
+# ------------
+#
+# env variables for (ba)sh and fish, available in the CLI and Scripting
+#
+# - set environment variables (except bash specific ones)
+# - executed by the command interpreters for login shells. Must be compatible with /bin/sh (bash,dash,ksh)
+#
+#
+#
+
+export BKB_HOME="$HOME/.bkb"
+
+########## PATH
+
+export PATH='/bin:/sbin:/usr/bin:/usr/local/bin'
+
+## System Variables
+### JAVA_HOME
+test -d "$HOME/build/openjdk/jdk-22.jdk/Contents/Home" && export JAVA_HOME="$HOME/build/openjdk/jdk-22.jdk/Contents/Home"
+
+### LLVM_HOME
+export LLVM_VERSION=12
+test -d "/usr/local/opt/$LLVM_VERSION" && export LLVM_HOME="/usr/local/opt/$LLVM_VERSION"
+
+## PATH
+test -d '/usr/sbin'         && export PATH="/usr/sbin:$PATH"
+test -d '/opt/bin'          && export PATH="/opt/bin:$PATH"
+test -d '/opt/sbin'         && export PATH="/opt/sbin:$PATH"
+test -d '/usr/local/sbin'   && export PATH="/usr/local/sbin:$PATH"
+test -d '/usr/local/bin'    && export PATH="/usr/local/bin:$PATH"
+test -d '/opt/local/bin'    && export PATH="/opt/local/bin:$PATH"
+test -d '/opt/local/sbin'   && export PATH="/opt/local/sbin:$PATH"
+test -d "$HOME/.bin"        && export PATH="$HOME/.bin:$PATH"
+test -d "$HOME/.local/bin"  && export PATH="$HOME/.local/bin:$PATH"
+test -d "$HOME/build/bin"   && export PATH="$HOME/build/bin:$PATH"
+test -d "$HOME/dev/bin"     && export PATH="$HOME/dev/bin:$PATH"
+test -d "$HOME/.opam/default/bin" && export PATH="$HOME/.opam/default/bin:$PATH"
+test -d "$HOME/.cargo/bin" && export PATH="$HOME/.cargo/bin:$PATH"
+test -d "/Applications/Racket v8.12/bin" &&  export PATH="/Applications/Racket v8.12/bin:$PATH"
+test -d "$HOME/go/bin" && export PATH="$HOME/go/bin:$PATH"
+test -d "$HOME/Library/Application Support/Coursier/bin" && export PATH="$HOME/Library/Application Support/Coursier/bin:$PATH"
+
+### LANG 
+test -d "$JAVA_HOME" &&  export PATH="$JAVA_HOME/bin:$PATH"
+test -d "$LLVM_HOME" &&  export PATH="$LLVM_HOME/bin:$PATH"
+
+#
+## ALIASES
+# In profile only essential commands
+test -f '/usr/local/opt/vim/bin/vim' && alias vim='/usr/local/opt/vim/bin/vim'
+
+test -f $HOME/.sbin/abspath.sh && alias abspath="dash $HOME/.sbin/abspath.sh"
+test -f $HOME/.sbin/ack.pl && alias ack="perl $HOME/.sbin/ack.pl"
+test -f $HOME/.sbin/rename.pl && alias rename="perl $HOME/.sbin/rename.pl"
+
+
+

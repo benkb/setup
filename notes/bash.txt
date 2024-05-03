@@ -1,0 +1,15 @@
+
+## Evaluate/Interpolate variables
+
+sys_var='HOME'
+
+env_var="${!sys_var}"
+
+=> return var for HOME
+
+
+## Check if Variable is empty or unset
+
+if [ -z ${var+x} ]; then echo "var is unset"; else echo "var is set to '$var'"; fi
+
+

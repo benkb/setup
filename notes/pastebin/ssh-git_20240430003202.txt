@@ -1,0 +1,5 @@
+
+# get git repo for a specific user the associated ssh key
+
+
+ GIT_SSH_COMMAND='ssh -i ~/.ssh/cloudkey_XXuserXX  -o IdentitiesOnly=yes' git clone git@github.com:EpicGames/UnrealEngine.git

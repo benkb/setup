@@ -1,0 +1,69 @@
+# ~/.bashrc: 
+# - executed by bash for (interactive) non-login shells.
+# - see /usr/share/doc/bash/examples/startup-files (in the package bash-doc) for examples
+# - configurations for interactive Bash usage , aliases, favorite editor, config the bash prompt
+
+
+# ~/.profile is loaded initially, but this is a simple way to update
+# edits in ~/.profile: simpy opening a new shell
+
+
+######## NONINTERACTIVE SHELL
+#
+
+if [ -f ~/.profile ] ; then
+    . ~/.profile
+else
+    echo "Warn: ~/.profile not loaded" >&2
+fi
+
+bashrc__script_path="$HOME/.bashrc_utils.bash"
+
+
+bashrc__script_loaded=
+[ -f "$bashrc__script_path" ] && source "$bashrc__script_path" && bashrc__script_loaded=1 
+
+[ -n "$bashrc__script_loaded" ] && bashrc_utils__run 'file_sourcing' "$HOME/kit" 'conf'
+
+
+# if this is a non-interactive (login) shell, then this is it
+[ -z "$PS1" ] && return
+
+######## INTERACTIVE SHELL
+#
+if [ -n "$bashrc__script_loaded" ]; then
+    bashrc_utils__run 'file_sourcing' "$HOME/kit" 'aliases'
+    bashrc_utils__run 'alias_gen' "$HOME/kit" 'utils' 'vi-utils'
+fi
+
+
+## GLOBAL SETTINGS
+# Setting for the new UTF-8 terminal support in Lion
+#
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+
+# From here on out, I put in things that are meaningful to interactive shells, like aliases,
+# `shopt` invocations, HISTORY control, terminal characteristics, PROMPT, etc.
+
+# in this setup ~/.bashrc is called by .bash_profile
+# If not running interactively, don't do anything
+
+set -o vi
+
+# See bash(1) for more options
+HISTCONTROL=ignoreboth
+
+# append to the history file, don't overwrite it
+shopt -s histappend
+
+# for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
+HISTSIZE=1000
+HISTFILESIZE=2000
+
+# check the window size after each command and, if necessary,
+# update the values of LINES and COLUMNS.
+shopt -s checkwinsize
+
+
