@@ -17,6 +17,7 @@ else
     echo "Warn: ~/.profile not loaded" >&2
 fi
 
+
 bashrc__script_path="$HOME/.bashrc_utils.bash"
 
 

@@ -12,4 +12,6 @@ env_var="${!sys_var}"
 
 if [ -z ${var+x} ]; then echo "var is unset"; else echo "var is set to '$var'"; fi
 
+## Uppercase to Lowercase
 
+    echo "Hello" | tr '[:upper:]' '[:lower:]'

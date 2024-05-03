@@ -33,7 +33,7 @@ help(){
     exit 1
 }
 
-stamp() { date +'%Y%m%d%H%M%S'; }
+secstamp() { date +'%Y%m%d%H%M%S'; }
 
 absdir() {
 	[ -n "${1:-}" ] || {
@@ -47,50 +47,60 @@ absdir() {
 }
 
 template__bkblib_init() {
-	echo 'hello'
 	: #bkblib__include 'libstd.sh'
 }
 
-template__run() {
-	local cwd="${1:-}"
-	[ -n "$cwd" ] || {
-		fail "cwd missing"
-		return 1
-	}
-	shift
+template__get_cliphome(){
 
-	local opt_write=
-	local filter=
-	while [ $# -gt 0 ]; do
-		case "$1" in
-		-w | --write) opt_write=1 ;;
-		-*)
-			fail "invalid opt $1"
-			return 1
-			;;
-		*)
-			filter="${1:-}"
-			shift
-			break
-			;;
-		esac
-		shift
-	done
+    local cliphome="$HOME/tmp/clipboard"
+    [ -d "$cliphome" ] && mkdir -p "$cliphome"
+
+    prn "$cliphome"
 }
+
 
 template__main() {
 
-	while [ $# -gt 0 ]; do
-		case "$1" in
-		-h | --help) help ;;
-		-w | --write) : ;;
-		-*) usage ;;
-		*) break ;;
-		esac
-		shift
-	done
+    local clipdir
+    clipdir="$(template__get_cliphome)"
 
-	template__run "$PWD" "$@" || die "Abort ..."
+    if [ -t 0 ]; then
+        while [ $# -gt 0 ]; do
+            case "$1" in
+            -h | --help) help ;;
+            -w | --write) : ;;
+            -*) usage ;;
+            *) break ;;
+            esac
+            shift
+        done
+        local secfile=
+        secfile="$(ls "$clipdir" | sort -r | head -1)"
+
+        if [ -n "$secfile" ] ; then
+            local secpath="$clipdir/$secfile"
+            [ -f "$secpath" ] || die "sec file invalid '$secpath'"
+            cat "$secpath"
+        else
+            exit 0
+        fi
+    else
+        local secstamp
+        secstamp="$(secstamp)"
+
+        local clipfile="$clipdir/$secstamp"
+        if [ -f "$clipfile" ] ; then
+            sleep 2
+            secstamp="$(secstamp)"
+            clipfile="$clipdir/$secstamp"
+        fi
+        
+        [ -f "$clipfile" ] && die  "Err: clipfile already exists '$clipfile'"
+
+        while read -r line ; do
+            echo "$line" >> $clipfile
+        done
+    fi
 }
 
 if [ -z "${BKB_SCRIPT_MAINDIR:-}" ]; then

@@ -2,56 +2,62 @@
 
 # Template for shell scripts
 #
-# Usage: [--|- Options] <Command> [args]
+# Shell scripts that also can be used as modules/libraries for other scripts.
+# When used as libraries this is how its done:
+# - First: set the the MODULINO=1
+#
+#
+#
+# Usage: [Options] [filter] [filename] [extension]
 #
 # Options:
-#   --help        show help
+#   --help          show help
+#   -w|--write      write to file (with a .sh extension)
 #
-# Commands:
-#   is-up        is tmux running
-#   is-inside    is this command called from inside a tmux terminal
 
-prn(){ printf "%s" $@; }
-info(){ echo "$@" >&2;  }
-die(){ echo "$@" >&2; exit 1; }
+set -u
 
-help(){ perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2; }
-usage(){ help | grep Usage  ; die "or: --help" ; }
-
-
-absdir(){ 
-    local fso="${1:-}"
-    [ -n "$fso" ] || die "Err: no filesystem object (file/dir)"
-    if [ -f "$fso" ] ; then (cd "$(dirname "$fso" 2>/dev/null)" && pwd -P)
-    elif [ -d "$fso" ] ; then (cd "$fso" 2>/dev/null && pwd -P)
-    else die "Err: invalid filesystem object (file/dir) under $fso"
-    fi
+prn() { printf "%s" "$@"; }
+fail() { echo "Fail: $*" >&2; }
+info() { echo "$@" >&2; }
+die() {
+	echo "$@" >&2
+	exit 1
 }
+stamp() { date +'%Y%m%d%H%M%S'; }
 
+main() {
 
-template__main(){
-    [ -n "${1:-}" ] || usage
+	local usage_script='die "$1\n" if /^#\s+(Usage:.*)$/'
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-h | --help)
+			perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+			perl -ne "$usage_script" "$0" >&2
+			exit 1
+			;;
+		-*)
+			perl -ne "$usage_script" "$0" >&2
+			exit 1
+			;;
+		*) break ;;
+		esac
+		shift
+	done
 
-    local cmd
-    while [ $# -gt 0 ] ; do
-        case "$1" in
-            -h|--help) help ; exit 1 ;;
-            -*) die "Err: invalid option '$1'";;
-            *)  cmd="$1"; shift; break ;;
-        esac
-        shift
-    done 
+    local os
+    os="$(uname | tr '[:upper:]' '[:lower:]')" ||  die 'could no get os'
 
-    [ -n "$cmd" ] || usage
+    if [ -z "$os" ] ; then die 'could not get os'; fi
 
-    case "$cmd" in
-        one) echo one  "$@";;
-        two) echo two  "$@";;
-        *) die "Err: invalid command '$cmd'" ;; 
+    case "$os" in
+        darwin) 
+            prn "$PWD" | pbcopy && prn "$PWD"
+            ;;
+        *)
+            die "Err: todo cwdcopy fo ros '$os'"
+            ;;
     esac
-
 }
 
-
-
-[ -n "${MODULINO:-}" ] || template__main "$@"
+main "$@" || "Abort ..."

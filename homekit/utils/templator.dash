@@ -12,179 +12,235 @@
 #
 # Options:
 #   --help          show help
-#   -w|--write      write to file (with a .sh extension) 
+#   -w|--write      write to file (with a .sh extension)
 #
 
 set -u
 
-prn(){ printf "%s" "$@"; }
-fail(){ echo "Fail: $@" >&2; }
-info(){ echo "$@" >&2; }
-die(){ echo "$@" >&2; exit 1; }
-
-absdir() { 
-    [ -n "${1:-}" ]  || { fail "no dir" ; return 1 ; }
-    (cd "${1:-}" && pwd -P) || { fail "absdir failed" ; return 1; }
+prn() { printf "%s" "$@"; }
+fail() { echo "Fail: $@" >&2; }
+info() { echo "$@" >&2; }
+die() {
+	echo "$@" >&2
+	exit 1
 }
 
-templator__init(){
-    local bkblib="${1:-}"
-    if [ -n "${bkblib}" ] ; then
-        [ -f "$bkblib" ] || { fail "could not load mainlib under '$bkblib'"; return 1 ; }
-        . "$bkblib"  || { fail "could not loac mainlib under '$bkblib'"; return 1; }
-    fi
-    : #bkblib__include 'libstd.sh'
+absdir() {
+	[ -n "${1:-}" ] || {
+		fail "no dir"
+		return 1
+	}
+	(cd "${1:-}" && pwd -P) || {
+		fail "absdir failed"
+		return 1
+	}
 }
 
-templator__catch_new_template(){
-    local cwd="${1:-}"
-    [ -n "$cwd" ] || { fail 'no cwd' ; return 1; }
-    local utilsdir="${2:-}"
-    [ -n "$utilsdir" ] || { fail 'no utilsdir' ; return 1; }
-
-    local do_write="${3:-}"
-    local filter="${4:-}"
-    local filename="${5:-}"
-    local extension="${6:-}"
-
-
-    local template=
-    local template_path=
-
-    for f in "$utilsdir"/* ; do
-        [ -f "$f" ] || continue
-        template="${f##*/}"
-        case "${template}" in 
-            _template*$filter*|template*$filter*) 
-                if [ -n "$template_path" ] ; then
-                    fail "template '$template_path' already set"
-                    return 1
-                else
-                    template_path="$f"
-                    break
-                fi
-            ;;
-            *) : ;;
-        esac
-    done
-
-    [ -n "$template_path" ] || { fail "no template found for '$filter'"; return 1; }
-    [ -f "$template_path" ] || { fail "no template found under '$template_path'"; return 1; }
-    [ -n "$template" ] || { fail "no template found for '$filter'"; return 1; }
-
-    local template_name=
-    template_name="$(perl -e '$ARGV[0]=~ s/^_*([^\.]+)\.[^.]+$/$1/g; print $ARGV[0];' "$template")" || {
-        fail "could not get template_name"; return 1; 
-    }
-
-    [ -n "$template_name" ] || { fail "could not get template_name" ; return 1; }
-
-    local write_extension=
-    if [ -n "$opt_write" ] ; then
-        if [ -n "$extension" ] ; then
-            write_extension="$extension"
-        else
-            write_extension="${template##*.}"
-        fi
-    else
-        if [ -n "$extension" ] ; then
-            write_extension="$extension"
-        fi
-    fi
-
-
-    local search_replace_string="s/${template_name}__/${filename}__/g"
-
-    if [ -n "$write_extension" ] ; then
-        local cwdpath=; cwdpath="$(absdir "$cwd")" || { fail "Err: could not set pwdpath"; return 1; }
-        local out_file="$filename.$write_extension"
-        local out_file_path="$cwdpath/$out_file"
-        [ -f "$out_file_path" ] && { fail "a file '$out_file_path' already exists" ; return 1; }
-        perl -pe "$search_replace_string" "$template_path" > "$out_file_path"
-        echo "'$new_scriptfile' written"
-    else
-        perl -pe "$search_replace_string" "$template_path" 
-    fi
+templator__init() {
+	local bkblib="${1:-}"
+	if [ -n "${bkblib}" ]; then
+		[ -f "$bkblib" ] || {
+			fail "could not load mainlib under '$bkblib'"
+			return 1
+		}
+		. "$bkblib" || {
+			fail "could not loac mainlib under '$bkblib'"
+			return 1
+		}
+	fi
+	: #bkblib__include 'libstd.sh'
 }
 
+templator__catch_new_template() {
+	local cwd="${1:-}"
+	[ -n "$cwd" ] || {
+		fail 'no cwd'
+		return 1
+	}
+	local utilsdir="${2:-}"
+	[ -n "$utilsdir" ] || {
+		fail 'no utilsdir'
+		return 1
+	}
 
-templator__list_templates(){
-    local utilsdir="${1:-}"
-    [ -n "$utilsdir" ] || { fail 'no utilsdir' ; return 1; }
+	local do_write="${3:-}"
+	local filter="${4:-}"
+	local filename="${5:-}"
+	local extension="${6:-}"
 
-    local filter="${2:-}"
+	local template=
+	local template_path=
 
-    local bf=
-    for f in "$utilsdir"/*; do
-        [ -f "$f" ] || continue
-        bf="${f##*/}"
-        case "$bf" in
-            _template*$filter*) echo "$bf" ;;
-            *) : ;;
-        esac
-    done
+	for f in "$utilsdir"/*; do
+		[ -f "$f" ] || continue
+		template="${f##*/}"
+		case "${template}" in
+		_template*$filter* | template*$filter*)
+			if [ -n "$template_path" ]; then
+				fail "template '$template_path' already set"
+				return 1
+			else
+				template_path="$f"
+				break
+			fi
+			;;
+		*) : ;;
+		esac
+	done
+
+	[ -n "$template_path" ] || {
+		fail "no template found for '$filter'"
+		return 1
+	}
+	[ -f "$template_path" ] || {
+		fail "no template found under '$template_path'"
+		return 1
+	}
+	[ -n "$template" ] || {
+		fail "no template found for '$filter'"
+		return 1
+	}
+
+	local template_name=
+	template_name="$(perl -e '$ARGV[0]=~ s/^_*([^\.]+)\.[^.]+$/$1/g; print $ARGV[0];' "$template")" || {
+		fail "could not get template_name"
+		return 1
+	}
+
+	[ -n "$template_name" ] || {
+		fail "could not get template_name"
+		return 1
+	}
+
+	local write_extension=
+	if [ -n "$opt_write" ]; then
+		if [ -n "$extension" ]; then
+			write_extension="$extension"
+		else
+			write_extension="${template##*.}"
+		fi
+	else
+		if [ -n "$extension" ]; then
+			write_extension="$extension"
+		fi
+	fi
+
+	local search_replace_string="s/${template_name}__/${filename}__/g"
+
+	if [ -n "$write_extension" ]; then
+		local cwdpath=
+		cwdpath="$(absdir "$cwd")" || {
+			fail "Err: could not set pwdpath"
+			return 1
+		}
+		local out_file="$filename.$write_extension"
+		local out_file_path="$cwdpath/$out_file"
+		[ -f "$out_file_path" ] && {
+			fail "a file '$out_file_path' already exists"
+			return 1
+		}
+		perl -pe "$search_replace_string" "$template_path" >"$out_file_path"
+		echo "'$new_scriptfile' written"
+	else
+		perl -pe "$search_replace_string" "$template_path"
+	fi
 }
 
+templator__list_templates() {
+	local utilsdir="${1:-}"
+	[ -n "$utilsdir" ] || {
+		fail 'no utilsdir'
+		return 1
+	}
 
-templator__run(){
-    local cwd="${1:-}"
-    [ -n "$cwd" ] || { fail "cwd missing"; return 1; }
-    shift
+	local filter="${2:-}"
 
-    local opt_write=
-    local filter=
-    while [ $# -gt 0 ] ; do
-        case "$1" in
-            -w|--write) opt_write=1 ;;
-            -*) fail "invalid opt $1"; return 1 ;;
-            *) filter="${1:-}"; shift; break;;
-        esac
-        shift
-    done
-
-    local utilsdir=$HOME/kit/utils
-    [ -d "$utilsdir" ] || { fail "no utilsdir in '$utilsdir'"; return 1; }
-
-    if [ $# -gt 0 ] ; then
-        templator__catch_new_template "$cwd" "$utilsdir" "$opt_write" "$filter" "$@"
-    else
-        [ -z "$opt_write" ] || { fail  "not enough args for opt_write"; return 1; }
-        templator__list_templates "$utilsdir" "$filter"
-        return 0
-    fi
+	local bf=
+	for f in "$utilsdir"/*; do
+		[ -f "$f" ] || continue
+		bf="${f##*/}"
+		case "$bf" in
+		_template*$filter*) echo "$bf" ;;
+		*) : ;;
+		esac
+	done
 }
 
+templator__run() {
+	local cwd="${1:-}"
+	[ -n "$cwd" ] || {
+		fail "cwd missing"
+		return 1
+	}
+	shift
 
-templator__main(){
+	local opt_write=
+	local filter=
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-w | --write) opt_write=1 ;;
+		-*)
+			fail "invalid opt $1"
+			return 1
+			;;
+		*)
+			filter="${1:-}"
+			shift
+			break
+			;;
+		esac
+		shift
+	done
 
-    local usage_script='die "$1\n" if /^#\s+(Usage:.*)$/'
-    while [ $# -gt 0 ] ; do
-        case "$1" in
-            -h|--help) 
-                perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
-                perl -ne "$usage_script" "$0"  >&2
-                exit 1
-                ;;
-            -w|--write) : ;;
-            -*)  
-                perl -ne "$usage_script" "$0"  >&2
-                exit 1
-                ;;
-            *) break;;
-        esac
-        shift
-    done
+	local utilsdir=$HOME/kit/utils
+	[ -d "$utilsdir" ] || {
+		fail "no utilsdir in '$utilsdir'"
+		return 1
+	}
 
-    templator__run "$PWD" "$@" || die "Aborting ..."
+	if [ $# -gt 0 ]; then
+		templator__catch_new_template "$cwd" "$utilsdir" "$opt_write" "$filter" "$@"
+	else
+		[ -z "$opt_write" ] || {
+			fail "not enough args for opt_write"
+			return 1
+		}
+		templator__list_templates "$utilsdir" "$filter"
+		return 0
+	fi
 }
 
+templator__main() {
 
+	local usage_script='die "$1\n" if /^#\s+(Usage:.*)$/'
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-h | --help)
+			perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+			perl -ne "$usage_script" "$0" >&2
+			exit 1
+			;;
+		-w | --write) : ;;
+		-*)
+			perl -ne "$usage_script" "$0" >&2
+			exit 1
+			;;
+		*) break ;;
+		esac
+		shift
+	done
 
-if [ -z "${BKB_MAINSCRIPTDIR:-}" ] ; then
-    BKB_MAINSCRIPTDIR="$(absdir $(dirname "$0" 2>/dev/null))" || die "Err: could not set BKB_MAINSCRIPTDIR"
-    [ -n "${BKB_MAINSCRIPTDIR:-}" ] || die "BKB_MAINSCRIPTDIR not set"
-    templator__init "$BKB_MAINSCRIPTDIR/bkblib.sh" || die "(templator__init): could not init, imports failed or not a modulino"
-    templator__main "$@"
+	templator__run "$PWD" "$@" || die "Aborting ..."
+}
+
+if [ -z "${BKB_MAINSCRIPTDIR:-}" ]; then
+	BKB_MAINSCRIPTDIR="$(absdir $(dirname "$0" 2>/dev/null))" || die "Err: could not set BKB_MAINSCRIPTDIR"
+	[ -n "${BKB_MAINSCRIPTDIR:-}" ] || die "BKB_MAINSCRIPTDIR not set"
+	templator__init "$BKB_MAINSCRIPTDIR/bkblib.sh" || die "(templator__init): could not init, imports failed or not a modulino"
+	templator__main "$@"
 else
-    templator__init || { fail "(templator__init): could not init, imports failed or not a modulino"; return 1; }
+	templator__init || {
+		fail "(templator__init): could not init, imports failed or not a modulino"
+		return 1
+	}
 fi

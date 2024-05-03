@@ -8,8 +8,9 @@
 #
 #
 #
+#
 
-export BKB_HOME="$HOME/.bkb"
+export BKB_LIBRARY_HOME="$HOME/.bkblib"
 
 ########## PATH
 
