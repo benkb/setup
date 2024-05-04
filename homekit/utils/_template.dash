@@ -12,7 +12,6 @@
 #
 # Options:
 #   --help          show help
-#   -w|--write      write to file (with a .sh extension)
 #
 
 set -u
@@ -24,85 +23,59 @@ die() {
 	echo "$@" >&2
 	exit 1
 }
-usage() { 
-    perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
-    exit 1
-} 
-help(){
-    perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
-    exit 1
-}
 
 stamp() { date +'%Y%m%d%H%M%S'; }
 
-absdir() {
-	[ -n "${1:-}" ] || {
-		fail "no dir"
-		return 1
-	}
-	(cd "${1:-}" && pwd -P) || {
-		fail "absdir failed"
-		return 1
-	}
+template__libinit() {
+	[ -n "${1:-}" ] && . "$1"
 }
 
-template__bkblib_init() {
-	echo 'hello'
-	: #bkblib__include 'libstd.sh'
+template__run(){
+    local input="${1:-}"
+    if [ -n "$input" ] ; then
+        fail "no valid input '$input'"
+        return 1
+    fi
 }
 
-template__run() {
-	local cwd="${1:-}"
-	[ -n "$cwd" ] || {
-		fail "cwd missing"
-		return 1
-	}
-	shift
-
-	local opt_write=
-	local filter=
-	while [ $# -gt 0 ]; do
-		case "$1" in
-		-w | --write) opt_write=1 ;;
-		-*)
-			fail "invalid opt $1"
-			return 1
-			;;
-		*)
-			filter="${1:-}"
-			shift
-			break
-			;;
-		esac
-		shift
-	done
-}
 
 template__main() {
+	local usage_pl='die "$1\n" if /^#\s+(Usage:.*)$/'
+	local help_pl='print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;'
 
 	while [ $# -gt 0 ]; do
 		case "$1" in
-		-h | --help) help ;;
-		-w | --write) : ;;
-		-*) usage ;;
+		-h | --help)
+			perl -ne "$help_pl" "$0" >&2
+			exit 1
+			;;
+		-*)
+			info "unknown option"
+			perl -ne "$usage_pl" "$0" >&2
+			exit 1
+			;;
 		*) break ;;
 		esac
 		shift
 	done
 
-	template__run "$PWD" "$@" || die "Abort ..."
+	if [ $# -gt 0 ]; then
+        template__run "$@"
+	else
+		perl -ne "$usage_pl" "$0" >&2
+		exit 1
+	fi
 }
 
-if [ -z "${BKB_SCRIPT_MAINDIR:-}" ]; then
-	BKB_SCRIPT_MAINDIR="$(absdir "$(dirname "$0" 2>/dev/null)")"
-	if [ -f "$BKB_SCRIPT_MAINDIR/bkblib.sh" ]; then
-		. "$BKB_SCRIPT_MAINDIR/bkblib.sh" || die "Err: could not load mainlib under '$BKB_SCRIPT_MAINDIR'"
-		template__bkblib_init || die "Err: could not init, imports failed or not a modulino"
+if [ -z "${BKB_SCRIPT_MAINLIB:-}" ]; then
+	BKB_SCRIPT_MAINLIB="$(dirname "$0" 2>/dev/null)/bkblib.sh"
+	if [ -f "$BKB_SCRIPT_MAINLIB" ]; then
+		template__libinit "$BKB_SCRIPT_MAINLIB" || die "Err: init failed with '$BKB_SCRIPT_MAINLIB'"
 	fi
-	template__main "$@" || "Abort ..."
+	template__main "$@" || die "Abort ..."
 else
-	template__bkblib_init || {
-		fail "(template__init): could not init, imports failed or not a modulino"
+	template__libinit || {
+		fail "(template__libinit): could not init"
 		return 1
 	}
 fi

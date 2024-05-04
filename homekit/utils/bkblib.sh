@@ -6,6 +6,7 @@ set -u
 # ignore SC3043: 'local' not POSIX
 # shellcheck disable=SC3043
 #
+#echo helloo
 
 BKBLIB__HAS_READLINK=
 BKBLIB__HAS_MD5SUM=

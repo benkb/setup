@@ -8,11 +8,14 @@
 #
 #
 #
-# Usage: [Options] [filter] [filename] [extension]
+# Usage: [Options] [Commands]
 #
 # Options:
 #   --help          show help
 #   -w|--write      write to file (with a .sh extension)
+#
+# Commands
+#   -pwd
 #
 
 set -u
@@ -24,13 +27,13 @@ die() {
 	echo "$@" >&2
 	exit 1
 }
-usage() { 
-    perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
-    exit 1
-} 
-help(){
-    perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
-    exit 1
+usage() {
+	perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
+	exit 1
+}
+help() {
+	perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+	exit 1
 }
 
 secstamp() { date +'%Y%m%d%H%M%S'; }
@@ -46,73 +49,132 @@ absdir() {
 	}
 }
 
-template__bkblib_init() {
+clip__bkblib_init() {
 	: #bkblib__include 'libstd.sh'
 }
 
-template__get_cliphome(){
+clip__get_cliphome() {
 
-    local cliphome="$HOME/tmp/clipboard"
-    [ -d "$cliphome" ] && mkdir -p "$cliphome"
+	local cliphome="$HOME/tmp/clipboard"
+	[ -d "$cliphome" ] && mkdir -p "$cliphome"
 
-    prn "$cliphome"
+	if [ -d "$cliphome" ]; then
+		prn "$cliphome"
+	else
+		fail "could not get cliphome '$cliphome'"
+		return 1
+	fi
 }
 
+clip__new_clipfile() {
+	local clipdir="${1:-}"
+	if [ -z "$clipdir" ] || ! [ -d "$clipdir" ]; then
+		fail "clipdir '$clipdir' invalid"
+		return 1
+	fi
 
-template__main() {
-
-    local clipdir
-    clipdir="$(template__get_cliphome)"
-
-    if [ -t 0 ]; then
-        while [ $# -gt 0 ]; do
-            case "$1" in
-            -h | --help) help ;;
-            -w | --write) : ;;
-            -*) usage ;;
-            *) break ;;
-            esac
-            shift
-        done
-        local secfile=
-        secfile="$(ls "$clipdir" | sort -r | head -1)"
-
-        if [ -n "$secfile" ] ; then
-            local secpath="$clipdir/$secfile"
-            [ -f "$secpath" ] || die "sec file invalid '$secpath'"
-            cat "$secpath"
+    local clippath=
+    for i in $(seq 1 4); do 
+        local secstamp
+        secstamp="$(secstamp)" || {
+            fail 'could not get secstamp'
+            return 1
+        }
+        if [ -z "$secstamp" ] ; then
+            fail 'could not get secstamp'
+            return 1
+        fi
+	    local clippath_probe="$clipdir/$secstamp"
+        if [ -f "$clippath_probe" ]; then
+		    sleep 1
         else
-            exit 0
+            clippath="$clippath_probe"
+            break
+        fi
+    done
+
+
+    if [ -n "$clippath" ] ; then
+        if [ -f "$clippath" ]; then
+            fail "clippath already exists '$clippath'"
+        else
+            prn "$clippath"
         fi
     else
-        local secstamp
-        secstamp="$(secstamp)"
-
-        local clipfile="$clipdir/$secstamp"
-        if [ -f "$clipfile" ] ; then
-            sleep 2
-            secstamp="$(secstamp)"
-            clipfile="$clipdir/$secstamp"
-        fi
-        
-        [ -f "$clipfile" ] && die  "Err: clipfile already exists '$clipfile'"
-
-        while read -r line ; do
-            echo "$line" >> $clipfile
-        done
+        fail "clippath could not be created'"
+        return 1
     fi
+}
+
+clip__get_last_clipfile() {
+	local clipdir="${1:-}"
+
+	if [ -z "$clipdir" ] || ! [ -d "$clipdir" ]; then
+		fail "clipdir '$clipdir' invalid"
+		return 1
+	fi
+
+	local clipfile=
+	clipfile="$(ls "$clipdir" | sort -r | head -1)" || {
+		fail 'could not fetch clipfile'
+		return 1
+	}
+
+	local clippath=
+	clippath="$clipdir/$clipfile"
+
+	if [ -n "$clipfile" ] && [ -f "$clippath" ]; then
+		prn "$clippath"
+	else
+		fail "secfile '$clippath' invalid"
+		return 1
+	fi
+}
+
+clip__main() {
+
+	local opt_pwd=
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-h | --help) help ;;
+		-*) usage ;;
+		-pwd) opt_pwd=1 ;;
+		*) break ;;
+		esac
+		shift
+	done
+
+	local clipdir
+	clipdir="$(clip__get_cliphome)" || die "Err: could not get clipdir"
+
+	if [ -t 0 ]; then
+		local clipfile=
+		clipfile="$(clip__get_last_clipfile "$clipdir")" || {
+			fail 'could no get clipfile'
+			return 1
+		}
+
+		cat "$clipfile"
+	else
+		local new_clipfile=
+		new_clipfile="$(clip__new_clipfile "$clipdir")" || die "could not get new clipfile"
+
+		while read -r line; do
+			echo "$line" >>$new_clipfile
+		done
+	fi
 }
 
 if [ -z "${BKB_SCRIPT_MAINDIR:-}" ]; then
 	BKB_SCRIPT_MAINDIR="$(absdir "$(dirname "$0" 2>/dev/null)")"
 	if [ -f "$BKB_SCRIPT_MAINDIR/bkblib.sh" ]; then
 		. "$BKB_SCRIPT_MAINDIR/bkblib.sh" || die "Err: could not load mainlib under '$BKB_SCRIPT_MAINDIR'"
-		template__bkblib_init || die "Err: could not init, imports failed or not a modulino"
+		clip__bkblib_init || die "Err: could not init, imports failed or not a modulino"
 	fi
-	template__main "$@" || "Abort ..."
+	clip__main "$@" || "Abort ..."
 else
-	template__bkblib_init || {
-		fail "(template__init): could not init, imports failed or not a modulino"
+	clip__bkblib_init || {
+		fail "(clip__init): could not init, imports failed or not a modulino"
 		return 1
 	}
 fi
