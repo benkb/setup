@@ -6,9 +6,7 @@
 # When used as libraries this is how its done:
 # - First: set the the MODULINO=1
 #
-#
-#
-# Usage: [Options] [filter] [filename] [extension]
+# Usage: [Options] [filename], or run with --help
 #
 # Options:
 #   --help          show help
@@ -16,6 +14,7 @@
 
 set -u
 
+#### Prelude
 prn() { printf "%s" "$@"; }
 fail() { echo "Fail: $*" >&2; }
 info() { echo "$@" >&2; }
@@ -24,57 +23,76 @@ die() {
 	exit 1
 }
 
+absdir() { (cd "${1}" && pwd -P); }
 stamp() { date +'%Y%m%d%H%M%S'; }
-
-template__libinit() {
-	[ -n "${1:-}" ] && . "$1"
-}
-
-template__run(){
-    local input="${1:-}"
-    if [ -n "$input" ] ; then
-        fail "no valid input '$input'"
+sourcing() {
+    [ -n "${1:-}" ] && . "$1" || {
+        fail "(sourcing): cannot source file '${1:-}'"
         return 1
-    fi
+    }
 }
 
 
-template__main() {
-	local usage_pl='die "$1\n" if /^#\s+(Usage:.*)$/'
-	local help_pl='print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;'
+#### Lib
 
+template__init() {
+	#local maindir="${BKB_MAIN_MODULINO_DIR:-}"
+    [ -n "${maindir:-}" ] && sourcing "$maindir/liburl.sh"
+    :
+}
+
+template__run() {
+
+	local input=
 	while [ $# -gt 0 ]; do
 		case "$1" in
-		-h | --help)
-			perl -ne "$help_pl" "$0" >&2
-			exit 1
-			;;
 		-*)
-			info "unknown option"
-			perl -ne "$usage_pl" "$0" >&2
-			exit 1
+			fail "unknown option"
+			return 1
 			;;
-		*) break ;;
+		*)
+			input="$1"
+			shift
+			break
+			;;
 		esac
 		shift
 	done
 
-	if [ $# -gt 0 ]; then
-        template__run "$@"
-	else
-		perl -ne "$usage_pl" "$0" >&2
+	if [ -z "$input" ]; then
+		fail "no valid input '$input'"
+		return 1
+	fi
+	echo iii $input
+}
+
+template__main() {
+
+	if [ $# -eq 0 ]; then
+		perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
 		exit 1
+	else
+		case "$1" in
+		-h | --help)
+			perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+			exit 1
+			;;
+		*) : ;;
+		esac
+	fi
+
+    #local bkblib="$BKB_MAIN_MODULINO_DIR/bkblib.sh"
+	if [ -f "${bkblib:-}" ]; then
+		sourcing "$bkblib" || die "Err: could not source bkblib" 
 	fi
 }
 
-if [ -z "${BKB_SCRIPT_MAINLIB:-}" ]; then
-	BKB_SCRIPT_MAINLIB="$(dirname "$0" 2>/dev/null)/bkblib.sh"
-	if [ -f "$BKB_SCRIPT_MAINLIB" ]; then
-		template__libinit "$BKB_SCRIPT_MAINLIB" || die "Err: init failed with '$BKB_SCRIPT_MAINLIB'"
-	fi
-	template__main "$@" || die "Abort ..."
+if [ -z "${BKB_MAIN_MODULINO_DIR:-}" ]; then
+	BKB_MAIN_MODULINO_DIR="$(absdir "$(dirname "$0")")" || die "Err: could not get absdir for '$0'"
+	[ -d "$BKB_MAIN_MODULINO_DIR" ] || die "Err: invalid dir for '$BKB_MODULINO_MAINDIR' for '$0'"
+	template__main "$@" && template__init && template__run "$@" || die "Abort ..."
 else
-	template__libinit || {
+	template__init || {
 		fail "(template__libinit): could not init"
 		return 1
 	}

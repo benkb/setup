@@ -1,0 +1,125 @@
+#!/bin/sh
+
+# Template for shell scripts
+#
+# Shell scripts that also can be used as modules/libraries for other scripts.
+# When used as libraries this is how its done:
+# - First: set the the MODULINO=1
+#
+# Usage: [Options] [filename|url], or run with --help
+#
+# Options:
+#   --help          show help
+#
+
+set -u
+
+prn() { printf "%s" "$@"; }
+fail() { echo "Fail: $*" >&2; }
+info() { echo "$@" >&2; }
+die() {
+	echo "$@" >&2
+	exit 1
+}
+
+absdir() { (cd "${1}" && pwd -P); }
+stamp() { date +'%Y%m%d%H%M%S'; }
+
+sourcing() {
+    [ -n "${1:-}" ] && . "$1" || {
+        fail "(sourcing): cannot source file '${1:-}'"
+        return 1
+    }
+}
+
+#### Lib
+
+chrome_open__init() {
+    local maindir="${BKB_MAIN_MODULINO_DIR:-}"
+
+    sourcing "$maindir/liburl.sh"
+    sourcing "$maindir/webloc.dash"
+}
+
+chrome_open__run() {
+
+	local input=
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-*)
+			fail "unknown option"
+			return 1
+			;;
+		*)
+			input="$1"
+			shift
+			break
+			;;
+		esac
+		shift
+	done
+
+	if [ -z "$input" ]; then
+		fail "no valid input '$input'"
+		return 1
+	fi
+
+    local address=
+    case "${input##*/}" in
+        *.webloc)
+            address="$(webloc__geturl "$input")" || {
+                fail "could not get file '$input'"
+                return 1
+            }
+
+            ;;
+        *)
+            address="$(liburl__get_url "$input")" || {
+                fail "could not get file '$input'"
+                return 1
+            }
+            ;;
+    esac
+    
+	if [ -z "$address" ]; then
+		fail "could not get address for  '$input'"
+		return 1
+	fi
+
+    osascript  -e "tell application \"Chromium\" to open location \"$address\""
+    #osascript  -e "tell application \"Google Chrome\" to open location \"$fileurl\""
+
+    
+}
+
+chrome_open__main() {
+
+    if [ $# -eq 0 ]; then
+        perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
+        exit 1
+    else
+        case "$1" in
+        -h | --help)
+            perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+            exit 1
+            ;;
+        *) : ;;
+        esac
+    fi
+
+    #local bkblib="$BKB_MAIN_MODULINO_DIR/bkblib.sh"
+    if [ -f "${bkblib:-}" ]; then
+        sourcing "$bkblib" || die "Err: could not source bkblib"
+    fi
+}
+
+if [ -z "${BKB_MAIN_MODULINO_DIR:-}" ]; then
+    BKB_MAIN_MODULINO_DIR="$(absdir "$(dirname "$0")")" || die "Err: could not get absdir for '$0'"
+    [ -d "$BKB_MAIN_MODULINO_DIR" ] || die "Err: invalid dir for '$BKB_MODULINO_MAINDIR' for '$0'"
+    chrome_open__main "$@" && chrome_open__init && chrome_open__run "$@" || die "Abort ..."
+else
+    chrome_open__init || {
+        fail "(chrome_open__libinit): could not init"
+        return 1
+    }
+fi

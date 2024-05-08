@@ -5,7 +5,9 @@ test -f "$HOME/dev/benkb-pub/sew/sew.git/sew.sh" && alias sew='sh $HOME/dev/benk
 test -f "$HOME/.bin/millw.sh" && alias millw="/usr/bin/env dash $HOME/.bin/millw.sh"
 
 test -d "$HOME/build/lobster" &&  export PATH="$HOME/build/lobster/bin:$PATH"
-alias ,shfmt='shfmt -i 4 -w'
+
+command -q shfmt && alias ,shfmt='shfmt -i 4 -w'
+
 # dir constants
 #
 #echo loading aliases
@@ -16,7 +18,6 @@ alias ,b="bash"
 alias ,cwd='perl -MCwd  -e  "print(Cwd::abs_path())" | pbcopy && pbpaste' 
 
 
-alias ,shfmt='shfmt -i 3 -w'
 
 
 # ack --follow: follow symlinks

@@ -1,2 +1,1 @@
-alias aliases-cache-reset='cache-reset aliases'
-alias reset-aliases-cache='cache-reset aliases'
+alias cache-reset-aliases='cache-reset aliases'

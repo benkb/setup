@@ -1,0 +1,250 @@
+#!/bin/sh
+
+# Template for shell scripts
+#
+# Shell scripts that also can be used as modules/libraries for other scripts.
+# When used as libraries this is how its done:
+# - First: set the the MODULINO=1
+#
+# Usage: [Options] [Commands] [filename], or run with --help
+#
+# Options:
+#   --help          show help
+#
+# Commands:
+# geturl:   get url from webloc
+# print:    print webloc xml to std
+# write:    write to disk, get filename from title
+#
+
+set -u
+
+prn() { printf "%s" "$*"; }
+fail() { echo "Fail: $*" >&2; }
+info() { echo "$@" >&2; }
+die() {
+   echo "$@" >&2
+   exit 1
+}
+
+absdir() { (cd "${1}" && pwd -P); }
+stamp() { date +'%Y%m%d%H%M%S'; }
+
+sourcing() {
+    [ -n "${1:-}" ] && . "$1" || {
+        fail "(sourcing): cannot source file '${1:-}'"
+        return 1
+    }
+}
+
+webloc__init() {
+    local maindir="${BKB_MAIN_MODULINO_DIR:-}"
+    [ -n "${maindir:-}" ] && sourcing "$maindir/liburl.sh"
+}
+
+
+webloc__write() {
+    local item="${1:-}"
+   if [ -z "$item" ]; then
+      fail 'no item'
+      return 1
+   fi
+   local title="${2:-}"
+
+   if [ -f "$item" ]; then
+      if [ -z "$title" ]; then
+         title="$(head -1 "$item")"
+      fi
+    else
+      case "$item" in
+      http*)
+         if [ -z "$title" ]; then
+            title="$(liburl__get_title "$item")" || {
+               fail "could not call liburl__get_title"
+               return 1
+            }
+         fi
+         ;;
+      *) : ;;
+      esac
+   fi
+   if [ -z "$title" ]; then
+      info 'cannot get title, please enter'
+      read -r title
+   fi
+
+   local clean_title=
+   if [ -n "$title" ]; then
+      clean_title="$(liburl__aux_clean_string "$title")" || {
+         fail "could not call liburl__aux_clean_string"
+         return 1
+      }
+   else
+      fail 'no title'
+      return 1
+   fi
+
+   if [ -z "$clean_title" ]; then
+      fail "could not get clean title for title '$title'"
+      return 1
+   fi
+
+   local file="$clean_title.webloc"
+
+   [ -f "$file" ] && {
+      fail "file exists already '$file'"
+      return 1
+   }
+
+   if webloc__print "$item" | tee "$file"; then
+      echo "Ok, file '$file' written"
+      return 0
+   else
+      fail "could not write to file '$file'"
+      return 1
+   fi
+}
+
+webloc__print() {
+   local item="${1:-}"
+   if [ -z "$item" ]; then
+      fail 'no item'
+      return 1
+   fi
+
+   if [ -f "$item" ]; then
+      local ext="${item##*.}"
+      case "$item" in
+      *.md | *.txt)
+         address="$(liburl__get_fileurl "$item")" || {
+             fail "(webloc__print): could not get file '$item'"
+            return 1
+         }
+         ;;
+      *)
+         if liburl__filext_big "$ext"; then
+            fail "(webloc__get_web_address): looks like file with unsupported file item '$item'"
+            return 1
+         else
+            fail "this file item is not supported '$item'"
+            return 1
+         fi
+         ;;
+      esac
+   elif [ -e "$item" ]; then
+      fail "this item exists on the file system, but is not a file '$item'"
+      return 1
+   else
+      address="$(webloc__get_web_address "$item")" || {
+         fail '(webloc__print): could not get address'
+         return 1
+      }
+   fi
+
+   [ -n "$address" ] || {
+      fail 'could not fetch address'
+      return 1
+   }
+
+   echo '<?xml version="1.0" encoding="UTF-8"?>'
+   echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+   echo '<plist version="1.0">'
+   echo '<dict>'
+   echo '    <key>URL</key>'
+   echo "	    <string>${address}</string>"
+   echo '</dict>'
+   echo '</plist>'
+
+}
+
+webloc__geturl() {
+   local webloc="${1:-}"
+   if [ -z "$webloc" ]; then
+      fail 'no *.webloc file'
+      return 1
+   fi
+
+   case "$webloc" in
+       *.webloc) : ;;
+       *) 
+           fail "doesn not look like a webloc '$webloc'"
+           return 1
+           ;;
+   esac
+
+   local string=
+   string="$(perl -ne '/\<string\>([^\<]*)\<\/string>/ && print $1' "$webloc")" || {
+       fail 'could not get string'
+        return 1
+    }
+    
+    if [ -n "$string" ] ; then
+        prn "$string"
+    else
+        fail 'string empty'
+        return 1
+    fi
+}
+
+
+
+webloc__run() {
+
+   local cmd=
+   while [ $# -gt 0 ]; do
+      case "$1" in
+      -*)
+         fail "unknown option, run --help"
+         return 1
+         ;;
+      write | geturl | print)
+         cmd="webloc__${1}"
+         shift
+         break
+         ;;
+      esac
+      shift
+   done
+
+   if [ -n "$cmd" ]; then
+      "${cmd}" "$@" || {
+         fail "could not run cmd '$cmd'"
+         return 1
+      }
+   else
+      fail 'found no cmd'
+      return 1
+   fi
+}
+
+webloc__main() {
+
+	if [ $# -eq 0 ]; then
+		perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
+		exit 1
+	else
+		case "$1" in
+		-h | --help)
+			perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+			exit 1
+			;;
+		*) : ;;
+		esac
+	fi
+
+    #local bkblib="$BKB_MAIN_MODULINO_DIR/bkblib.sh"
+	if [ -f "${bkblib:-}" ]; then
+		sourcing "$bkblib" || die "Err: could not source bkblib" 
+	fi
+}
+
+if [ -z "${BKB_MAIN_MODULINO_DIR:-}" ]; then
+	BKB_MAIN_MODULINO_DIR="$(absdir "$(dirname "$0")")" || die "Err: could not get absdir for '$0'"
+	[ -d "$BKB_MAIN_MODULINO_DIR" ] || die "Err: invalid dir for '$BKB_MODULINO_MAINDIR' for '$0'"
+	webloc__main "$@" && webloc__init && webloc__run "$@" || die "Abort ..."
+else
+	webloc__init || {
+		fail "(webloc__libinit): could not init"
+		return 1
+	}
+fi
