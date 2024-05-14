@@ -1,0 +1,168 @@
+#!/bin/sh
+
+# Handle actions around personal cache directory
+#
+# Usage: <Command> [args], or run --help
+#
+# Command:
+#   
+#   reset 
+#   home|info        show the cache dir
+#
+#
+
+set -eu
+
+
+#### Prelude
+prn() { printf "%s" "$@"; }
+fail() { echo "Fail: $*" >&2; }
+info() { echo "$@" >&2; }
+
+die() {
+	echo "$@" >&2
+	exit 1
+}
+
+absdir() { (cd "${1}" && pwd -P); }
+stamp() { date +'%Y%m%d%H%M%S'; }
+
+utils_cache__init() {
+    :
+}
+
+utils_cache__get_cache_home(){
+
+    local cache_home="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+
+    if [ -n "$cache_home" ] ; then
+        if [ -d "$cache_home" ]; then 
+            prn "$cache_home"
+        else
+            fail "invalid dir for cache home under '$cache_home'"
+            return 1
+        fi
+    else
+        fail "no cache home under '$cache_home'"
+        return 1
+    fi
+}
+
+utils_cache__get_dir(){
+    local subdir="${1:-}"
+
+    if [ -z "$subdir" ] ; then
+        fail '(cache__get_dir): no subdir'
+        return 1
+    fi
+
+    local  cache_home="$(utils_cache__get_cache_home)"
+
+    local cache_subdir="$cache_home/$subdir"
+    if [ -d "$cache_subdir" ]  ; then
+        prn "$cache_subdir"
+    else
+        fail "could not get subdir under '$cache_subdir'"
+        return 1
+    fi
+
+
+}
+
+utils_cache__reset(){
+
+    local opt_quiet=
+    case $# in
+        0|1)
+            fail '(cache__reset): not enough args'
+            return 1
+            ;;
+        2) 
+            opt_quiet="${1}"
+            shift
+            local cache_dir=
+            cache_dir="$(utils_cache__get_dir "$@")" 
+            ;;
+        *)
+            fail '(cache__reset): too many args'
+            return 1
+            ;;
+    esac
+
+
+    [ -n "$cache_dir" ] && [ -d "$cache_dir" ] || {
+        fail "no valid cachedir under '$cache_dir'"
+        return 1
+    }
+
+    rm -r "$cache_dir"/* 
+}
+
+    
+utils_cache__run(){
+    
+    local opt_quiet=
+    local arg=
+    local cmd=
+    while [ $# -gt 0 ] ; do
+        arg="$1"
+        shift
+        case "$arg" in
+            -q|--quiet) opt_quiet=1 ;;
+            -*) 
+                fail "unknown option '$arg'"
+                return 1
+                ;;
+            home|info)  
+                utils_cache__get_cache_home 
+                break
+                ;;
+            reset)  
+                utils_cache__reset "$opt_quiet" "$@"
+                break
+                ;;
+            *) 
+                fail "unknown arg '$arg'"
+                break 
+                ;;
+        esac
+    done
+
+}
+
+
+utils_cache__main() {
+
+	if [ $# -eq 0 ]; then
+		perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
+		exit 1
+	else
+		case "$1" in
+		-h | --help)
+			perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+			exit 1
+			;;
+		*) : ;;
+		esac
+	fi
+
+    local libmain=
+    #local libmain="$BKB_MAINSCRIPT_DIR/libmain.sh"
+	if [ -n "${libmain:-}" ] ; then
+       . "$libmain"  || die "Err: could not source libmain" 
+    fi
+}
+
+#### Modulino
+
+if [ -z "${BKB_MAINSCRIPT_DIR:-}" ]; then
+	BKB_MAINSCRIPT_DIR="$(absdir "$(dirname "$0")")" || die "Err: could not get absdir for '$0'"
+	[ -d "$BKB_MAINSCRIPT_DIR" ] || die "Err: invalid dir for '$BKB_MAINSCRIPT_DIR' for '$0'"
+	utils_cache__main "$@" && utils_cache__init && utils_cache__run "$@" || die "Abort ..."
+else
+	utils_cache__init || {
+		fail " could not init"
+		return 1
+	}
+fi

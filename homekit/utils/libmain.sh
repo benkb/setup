@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 set -u
 
@@ -8,15 +7,43 @@ set -u
 #
 #echo helloo
 
-BKBLIB__HAS_READLINK=
-BKBLIB__HAS_MD5SUM=
+#BKB_HOST_HAS_READLINK=
+#BKB_HOST_HAS_MD5SUM=
+#BKB_HOST_OS=
+
 
 prn() { printf "%s" "$@"; }
 info() { echo "$@" >&2; }
 fail() { echo "Fail: $*" >&2; }
 stampsec() { date +'%Y%m%d%H%M%S'; }
 
-_bkblib__lib_check() {
+utils_libmain__get_host_os(){
+
+	if [ -z "${BKB_HOST_OS:-}" ]; then
+        local hostos=
+        hostos="$(uname -s)" && [ -n "$hostos" ]  ||  {
+            fail 'could not run uname -s'
+            return 1
+        }
+
+        local hostosuc=
+        hostosuc="$(prn "$hostos" | tr '[:lower:]' '[:upper:]')" && [ -n "$hostosuc" ]  || {
+            fail 'could not run uname -s'
+            return 1
+        }
+        case "${hostosuc}" in
+            LINUX|DARWIN|CYGWIN|MINGW|MSYS_NT) 
+                BKB_HOST_OS="$hostosuc" 
+                prn "$hostosuc"
+                ;;
+            *) info "Host os not supported '$hostosuc'" ;;
+        esac
+    else
+        prn "$BKB_HOST_OS"
+	fi
+}
+
+_utils_libmain__lib_check() {
 	local mainscript_ext="${1:-}"
 
 	if [ -z "$mainscript_ext" ]; then
@@ -66,7 +93,7 @@ _bkblib__lib_check() {
 	esac
 }
 
-_bkblib__calc_libstr() {
+_utils_libmain__calc_libstr() {
 	local lib_ext="${1:-}"
 	if [ -z "$lib_ext" ]; then
 		fail 'no lib_ext'
@@ -96,7 +123,7 @@ _bkblib__calc_libstr() {
 	prn "$lib_str"
 }
 
-_bkblib__getlib() {
+_utils_libmain__getlib() {
 	local lib_str="${1:-}"
 	if [ -z "$lib_str" ]; then
 		fail "(get_libpath): no lib_str"
@@ -133,7 +160,7 @@ _bkblib__getlib() {
 	local lib_name="${lib%.*}"
 	local lib_ext="${lib##*.}"
 
-	_bkblib__lib_check "$main_script_ext" "$lib_ext"
+	_utils_libmain__lib_check "$main_script_ext" "$lib_ext"
 
 	local lib_path
 	case "$lib_str" in
@@ -147,9 +174,9 @@ _bkblib__getlib() {
 		done
 		;;
 	*)
-		if [ -n "${BKB_SCRIPT_MAINDIR:-}" ]; then
-			if [ -f "$BKB_SCRIPT_MAINDIR/$lib_str" ]; then
-				lib_path="$BKB_SCRIPT_MAINDIR/$lib_str"
+		if [ -n "${BKB_MODULINO_MAINDIR:-}" ]; then
+			if [ -f "$BKB_MODULINO_MAINDIR/$lib_str" ]; then
+				lib_path="$BKB_MODULINO_MAINDIR/$lib_str"
 			fi
 		fi
 		;;
@@ -168,7 +195,7 @@ _bkblib__getlib() {
 	prn "${lib_path}"
 }
 
-bkblib__getlib() {
+utils_libmain__getlib() {
 	local lib="${1:-}"
 	if [ -z "$lib" ]; then
 		fail "(get_libpath): no lib"
@@ -178,16 +205,16 @@ bkblib__getlib() {
 	local lib_ext="${lib##*.}"
 
 	local lib_str
-	lib_str="$(_bkblib__calc_libstr "$lib_ext" $@)"
+	lib_str="$(_utils_libmain__calc_libstr "$lib_ext" $@)"
 	if [ -z "$lib_str" ]; then
 		fail 'no lib_str'
 		return 1
 	fi
 
-	_bkblib__getlib "$lib_str" $@
+	_utils_libmain__getlib "$lib_str" $@
 }
 
-bkblib__loadlib() { # for foolib.sh modulino.dash
+utils_libmain__loadlib() { # for foolib.sh modulino.dash
 	local lib="${1:-}"
 	if [ -z "$lib" ]; then
 		fail "lib empty"
@@ -197,7 +224,7 @@ bkblib__loadlib() { # for foolib.sh modulino.dash
 	local lib_ext="${lib##*.}"
 
 	local lib_str=
-	lib_str="$(_bkblib__calc_libstr "$lib_ext" $@)"
+	lib_str="$(_utils_libmain__calc_libstr "$lib_ext" $@)"
 	if [ -z "$lib_str" ]; then
 		fail 'no lib_str'
 		return 1
@@ -209,15 +236,15 @@ bkblib__loadlib() { # for foolib.sh modulino.dash
 				echo already
 				return 0
 			else
-				fail "(bkblib__loadlib): a lib '$lib' already loaded, but u  '$lib_str' not loaded"
+				fail "(utils_libmain__loadlib): a lib '$lib' already loaded, but u  '$lib_str' not loaded"
 				fail "but under different path ('${l##*,}' / '$lib_str'"
 				return 1
 			fi
 		fi
 	done
 	local lib_path=
-	lib_path="$(_bkblib__getlib "$lib_str" "$@")" || {
-		fail "(_bkblib__source): library not loaded '$lib'"
+	lib_path="$(_utils_libmain__getlib "$lib_str" "$@")" || {
+		fail "(_utils_libmain__source): library not loaded '$lib'"
 		return 1
 	}
 
@@ -240,7 +267,7 @@ bkblib__loadlib() { # for foolib.sh modulino.dash
 
 #        realp="$(perl -MCwd -e 'print(Cwd::abs_path($ARGV[0]))' "${path}")" || {
 
-_bkblib_abspath_shell() {
+_utils_libmain__readlink_shell() {
 	local fso="${1:-}"
 	if [ -z "$fso" ]; then
 		fail "(abspath): no filesystem object (file/dir)"
@@ -278,28 +305,25 @@ _bkblib_abspath_shell() {
 	fi
 }
 
-bkblib_abspath() {
+utils_libmain__readlink() {
 	local fso="${1:-}"
 	if [ -z "$fso" ]; then
 		fail "(abspath): no filesystem object (file/dir)"
 		return 1
 	fi
 
-	if [ -z "${BKBLIB__HAS_READLINK:-}" ]; then
-
-		local has_readlink=
-		has_readlink="$(command -v readlink)"
-		if [ -n "$has_readlink" ]; then
-			BKBLIB__HAS_READLINK=1
-		else
-			BKBLIB__HAS_READLINK=0
-		fi
+	if [ -z "${utils_libmain__HAS_READLINK:-}" ]; then
+        if command -q readlink ; then
+			BKB_HOST_HAS_READLINK=1
+        else
+			BKB_HOST_HAS_READLINK=0
+        fi
 	fi
 
-	case "${BKBLIB__HAS_READLINK:-}" in
+	case "${BKB_HOST_HAS_READLINK:-}" in
 	1) readlink -f "$fso" ;;
 	0)
-		_bkblib_abspath_shell "$fso" || {
+		_utils_libmain__readlink_shell "$fso" || {
 			fail '_bkblib_abspath_shell_ failed'
 			return 1
 		}
@@ -311,7 +335,7 @@ bkblib_abspath() {
 	esac
 }
 
-bkblib__absdir() {
+utils_libmain__absdir() {
 	local fso="${1:-}"
 	if [ -z "$fso" ]; then
 		fail "(abspath): no filesystem object (file/dir)"
@@ -343,7 +367,7 @@ bkblib__absdir() {
 # - a file or a dir, or a link
 # - copy the link  or symlink depending on the source
 #
-bkblib__link_to_target() {
+utils_libmain__link_to_target() {
 	local source="${1:-}"
 	if [ -z "$source" ]; then
 		fail "no source"
@@ -361,11 +385,11 @@ bkblib__link_to_target() {
 		return 1
 	fi
 
-	local target_dir="$(dirname "$target")"
-	if ! [ -d "$target_dir" ]; then
+    local target_dir=
+    target_dir="$(dirname "$target")" && [ -d "$target_dir" ] ||
 		fail "no valid target_dir '$target_dir'"
 		return 1
-	fi
+    }
 
 	if [ -e "$target" ]; then
 		if ! [ -L "$target" ]; then
@@ -384,17 +408,17 @@ bkblib__link_to_target() {
 	fi
 }
 
-bkblib__is_number() {
+utils_libmain__is_number() {
 	case "${1:-}" in
 	'' | *[!0-9]*) die "Err: lnr '${1:-}' not a number" ;;
 	*) : ;;
 	esac
 }
 
-bkblib__absdir() {
+utils_libmain__absdir() {
 	local fso="${1:-}"
 	if [ -z "$fso" ]; then
-		fail "(bkblib__absdir):  no filesystem object (file/dir)"
+		fail "(utils_libmain__absdir):  no filesystem object (file/dir)"
 		return 1
 	fi
 	if [ -f "$fso" ]; then
@@ -402,39 +426,38 @@ bkblib__absdir() {
 	elif [ -d "$fso" ]; then
 		(cd "$fso" 2>/dev/null && pwd -P)
 	else
-		fail "(bkblib__absdir): invalid filesystem object (file/dir) under $fso"
+		fail "(utils_libmain__absdir): invalid filesystem object (file/dir) under $fso"
 		return 1
 	fi
 }
 
-bkblib__md5sum() {
+utils_libmain__md5sum() {
 	local string="${1:-}"
 	if [ -z "$string" ]; then
-		fail "(bkblib__md4sum): no string given"
+		fail "(utils_libmain__md4sum): no string given"
 		return 1
 	fi
 
-	if [ -z "${BKBLIB__HAS_MD5SUM:-}" ]; then
-		local has_md5sum=
-		has_md5sum="$(command -v md5sum)"
-		if [ -n "$has_md5sum" ]; then
-			BKBLIB__HAS_MD5SUM=1
-		else
-			BKBLIB__HAS_MD5SUM=0
-		fi
+	if [ -z "${utils_libmain__HAS_MD5SUM:-}" ]; then
+        if command -q md5sum ; then
+			BKB_HOST_HAS_MD5SUM=1
+        else
+			BKB_HOST_HAS_MD5SUM=0
+        fi
 	fi
 
+
 	local md5str=
-	case "${BKBLIB__HAS_MD5SUM:-}" in
+	case "${BKB_HOST_HAS_MD5SUM:-}" in
 	1)
-		md5str="$(prn "$string" | md5sum | cut -f1 -d" ")" || {
+		md5str="$(prn "$string" | md5sum | cut -f1 -d" ")" && [ -n "$md5str" ] ||  {
 			fail "(m5sum): could not run shell commands"
 			return 1
 		}
 		;;
 
 	0)
-		md5str="$(perl -MDigest::MD5 -e 'print(Digest::MD5::md5_hex($ARGV[0]))' "$string")" || {
+		md5str="$(perl -MDigest::MD5 -e 'print(Digest::MD5::md5_hex($ARGV[0]))' "$string")" && [ -n "$md5str" ] || {
 			fail "(md5sum) could not run perl command"
 			return 1
 		}
@@ -452,3 +475,5 @@ bkblib__md5sum() {
 		return 1
 	fi
 }
+
+#utils_libmain__get_host_os

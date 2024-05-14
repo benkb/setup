@@ -4,7 +4,6 @@
 #
 # Shell scripts that also can be used as modules/libraries for other scripts.
 # When used as libraries this is how its done:
-# - First: set the the MODULINO=1
 #
 #
 #
@@ -18,7 +17,7 @@
 #   -pwd
 #
 
-set -u
+set -eu
 
 prn() { printf "%s" "$@"; }
 fail() { echo "Fail: $*" >&2; }
@@ -38,22 +37,13 @@ help() {
 
 secstamp() { date +'%Y%m%d%H%M%S'; }
 
-absdir() {
-	[ -n "${1:-}" ] || {
-		fail "no dir"
-		return 1
-	}
-	(cd "${1:-}" && pwd -P) || {
-		fail "absdir failed"
-		return 1
-	}
+absdir() { (cd "${1}" && pwd -P); }
+
+utils_clip__init() {
+    :
 }
 
-clip__bkblib_init() {
-	: #bkblib__include 'libstd.sh'
-}
-
-clip__get_cliphome() {
+utils_clip__get_cliphome() {
 
 	local cliphome="$HOME/tmp/clipboard"
 	[ -d "$cliphome" ] && mkdir -p "$cliphome"
@@ -66,7 +56,7 @@ clip__get_cliphome() {
 	fi
 }
 
-clip__new_clipfile() {
+utils_clip__new_clipfile() {
 	local clipdir="${1:-}"
 	if [ -z "$clipdir" ] || ! [ -d "$clipdir" ]; then
 		fail "clipdir '$clipdir' invalid"
@@ -106,7 +96,7 @@ clip__new_clipfile() {
     fi
 }
 
-clip__get_last_clipfile() {
+utils_clip__get_last_clipfile() {
 	local clipdir="${1:-}"
 
 	if [ -z "$clipdir" ] || ! [ -d "$clipdir" ]; then
@@ -115,15 +105,17 @@ clip__get_last_clipfile() {
 	fi
 
 	local clipfile=
-	clipfile="$(ls "$clipdir" | sort -r | head -1)" || {
+	clipfile="$(ls "$clipdir" | sort -r | head -1)" 
+
+    if [ -z "$clipfile" ] ; then
 		fail 'could not fetch clipfile'
 		return 1
-	}
+    fi
 
 	local clippath=
 	clippath="$clipdir/$clipfile"
 
-	if [ -n "$clipfile" ] && [ -f "$clippath" ]; then
+	if [ -f "$clippath" ]; then
 		prn "$clippath"
 	else
 		fail "secfile '$clippath' invalid"
@@ -131,33 +123,32 @@ clip__get_last_clipfile() {
 	fi
 }
 
-clip__main() {
+utils_clip__run() {
 
 	local opt_pwd=
 	while [ $# -gt 0 ]; do
 		case "$1" in
-		-h | --help) help ;;
-		-*) usage ;;
 		-pwd) opt_pwd=1 ;;
+		-*) 
+            fail 'invalid option'
+            return 1
+            ;;
 		*) break ;;
 		esac
 		shift
 	done
 
 	local clipdir
-	clipdir="$(clip__get_cliphome)" || die "Err: could not get clipdir"
+	clipdir="$(utils_clip__get_cliphome)" 
 
 	if [ -t 0 ]; then
 		local clipfile=
-		clipfile="$(clip__get_last_clipfile "$clipdir")" || {
-			fail 'could no get clipfile'
-			return 1
-		}
+		clipfile="$(utils_clip__get_last_clipfile "$clipdir")" 
 
 		cat "$clipfile"
 	else
 		local new_clipfile=
-		new_clipfile="$(clip__new_clipfile "$clipdir")" || die "could not get new clipfile"
+		new_clipfile="$(utils_clip__new_clipfile "$clipdir")" 
 
 		while read -r line; do
 			echo "$line" >>$new_clipfile
@@ -165,16 +156,33 @@ clip__main() {
 	fi
 }
 
-if [ -z "${BKB_SCRIPT_MAINDIR:-}" ]; then
-	BKB_SCRIPT_MAINDIR="$(absdir "$(dirname "$0" 2>/dev/null)")"
-	if [ -f "$BKB_SCRIPT_MAINDIR/bkblib.sh" ]; then
-		. "$BKB_SCRIPT_MAINDIR/bkblib.sh" || die "Err: could not load mainlib under '$BKB_SCRIPT_MAINDIR'"
-		clip__bkblib_init || die "Err: could not init, imports failed or not a modulino"
-	fi
-	clip__main "$@" || "Abort ..."
+utils_clip__main() {
+
+    case "${1:-}" in
+    -h | --help)
+        perl -ne 'print "$1\n" if /^\s*#\s(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+        exit 1
+        ;;
+    *) : ;;
+    esac
+
+    local libmain=
+    #local libmain="$BKB_MAINSCRIPT_DIR/libmain.sh"
+    if [ -n "${libmain:-}" ]; then
+        . "$libmain" || die "Err: could not source libmain.sh"
+    fi
+
+} 
+
+#### Modulino
+
+if [ -z "${BKB_MAINSCRIPT_DIR:-}" ]; then
+    BKB_MAINSCRIPT_DIR="$(absdir "$(dirname "$0")")" || die "Err: could not get absdir for '$0'"
+    [ -d "$BKB_MAINSCRIPT_DIR" ] || die "Err: invalid dir for '$BKB_MAINSCRIPT_DIR' for '$0'"
+    utils_clip__main "$@" && utils_clip__init && utils_clip__run "$@" || die "Abort ..."
 else
-	clip__bkblib_init || {
-		fail "(clip__init): could not init, imports failed or not a modulino"
-		return 1
-	}
+    utils_clip__init || {
+        fail "could not init"
+        return 1
+    }
 fi

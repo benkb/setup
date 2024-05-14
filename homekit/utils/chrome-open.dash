@@ -4,7 +4,6 @@
 #
 # Shell scripts that also can be used as modules/libraries for other scripts.
 # When used as libraries this is how its done:
-# - First: set the the MODULINO=1
 #
 # Usage: [Options] [filename|url], or run with --help
 #
@@ -12,7 +11,7 @@
 #   --help          show help
 #
 
-set -u
+set -eu
 
 prn() { printf "%s" "$@"; }
 fail() { echo "Fail: $*" >&2; }
@@ -25,23 +24,18 @@ die() {
 absdir() { (cd "${1}" && pwd -P); }
 stamp() { date +'%Y%m%d%H%M%S'; }
 
-sourcing() {
-    [ -n "${1:-}" ] && . "$1" || {
-        fail "(sourcing): cannot source file '${1:-}'"
-        return 1
-    }
-}
 
 #### Lib
 
-chrome_open__init() {
-    local maindir="${BKB_MAIN_MODULINO_DIR:-}"
+utils_chrome_open__init() {
 
-    sourcing "$maindir/liburl.sh"
-    sourcing "$maindir/webloc.dash"
+    local maindir="${BKB_MAINSCRIPT_DIR:-}"
+
+    . "$maindir/liburl.sh"
+    . "$maindir/webloc.dash"
 }
 
-chrome_open__run() {
+utils_chrome_open__run() {
 
 	local input=
 	while [ $# -gt 0 ]; do
@@ -92,7 +86,7 @@ chrome_open__run() {
     
 }
 
-chrome_open__main() {
+utils_chrome_open__main() {
 
     if [ $# -eq 0 ]; then
         perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
@@ -107,19 +101,19 @@ chrome_open__main() {
         esac
     fi
 
-    #local bkblib="$BKB_MAIN_MODULINO_DIR/bkblib.sh"
-    if [ -f "${bkblib:-}" ]; then
-        sourcing "$bkblib" || die "Err: could not source bkblib"
+    #local libmain="$BKB_MAINSCRIPT_DIR/libmain.sh"
+    if [ -f "${libmain:-}" ]; then
+        . "$libmain" || die "Err: could not source bkblib"
     fi
 }
 
-if [ -z "${BKB_MAIN_MODULINO_DIR:-}" ]; then
-    BKB_MAIN_MODULINO_DIR="$(absdir "$(dirname "$0")")" || die "Err: could not get absdir for '$0'"
-    [ -d "$BKB_MAIN_MODULINO_DIR" ] || die "Err: invalid dir for '$BKB_MODULINO_MAINDIR' for '$0'"
-    chrome_open__main "$@" && chrome_open__init && chrome_open__run "$@" || die "Abort ..."
+if [ -z "${BKB_MAINSCRIPT_DIR:-}" ]; then
+    BKB_MAINSCRIPT_DIR="$(absdir "$(dirname "$0")")" || die "Err: could not get absdir for '$0'"
+    [ -d "$BKB_MAINSCRIPT_DIR" ] || die "Err: invalid dir for '$BKB_MAINSCRIPT_DIR' for '$0'"
+    utils_chrome_open__main "$@" && utils_chrome_open__init && utils_chrome_open__run "$@" || die "Abort ..."
 else
-    chrome_open__init || {
-        fail "(chrome_open__libinit): could not init"
+    utils_chrome_open__init || {
+        fail "(utils_chrome_open__libinit): could not init"
         return 1
     }
 fi

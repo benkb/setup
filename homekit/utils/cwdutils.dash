@@ -1,0 +1,102 @@
+#!/bin/sh
+
+# Template for shell scripts
+#
+# Shell scripts that also can be used as modules/libraries for other scripts.
+# When used as libraries this is how its done:
+#
+# Usage: [Options] [Commands] <input>, or run with --help
+#
+# Options:
+#   --help          show help
+#
+# Commands:
+#   cc        copy cwd to clipboard
+
+set -u
+
+#### Prelude
+prn() { printf "%s" "$@"; }
+fail() { echo "Fail: $*" >&2; }
+info() { echo "$@" >&2; }
+die() {
+	echo "$@" >&2
+	exit 1
+}
+
+absdir() { (cd "${1}" && pwd -P); }
+stamp() { date +'%Y%m%d%H%M%S'; }
+sourcing() {
+    [ -n "${1:-}" ] && . "$1" || {
+        fail "(sourcing): cannot source file '${1:-}'"
+        return 1
+    }
+}
+
+
+#### Lib
+
+cwdutils__init() {
+	#local maindir="${BKB_MODULINO_MAINDIR:-}"
+    [ -n "${maindir:-}" ] && sourcing "$maindir/liburl.sh"
+    :
+}
+
+cwdutils__copy_to_clipboard(){
+    BKBZZ
+
+}
+
+cwdutils__run() {
+
+	local cmd=
+    local arg=
+	while [ $# -gt 0 ]; do
+        arg="${1:-}"
+        shift
+		case "$arg" in
+		-*)
+			fail "unknown option"
+			return 1
+			;;
+        cc) cwdutils__copy_to_clipboard "$@" ;;
+		*)
+			fail "unknown arg"
+			return 1
+			;;
+		esac
+		shift
+	done
+}
+
+cwdutils__main() {
+
+	if [ $# -eq 0 ]; then
+		perl -ne 'die "$1\n" if /^#\s+(Usage:.*)$/' "$0" >&2
+		exit 1
+	else
+		case "$1" in
+		-h | --help)
+			perl -ne 'print "$1\n" if /^\s*#\s+(.*)/; exit if /^\s*[^#\s]+/;' "$0" >&2
+			exit 1
+			;;
+		*) : ;;
+		esac
+	fi
+
+    #local bkblib="$BKB_MODULINO_MAINDIR/bkblib.sh"
+	if [ -f "${bkblib:-}" ]; then
+		sourcing "$bkblib" || die "Err: could not source bkblib" 
+	fi
+}
+
+if [ -z "${BKB_MODULINO_MAINDIR:-}" ]; then
+	BKB_MODULINO_MAINDIR="$(absdir "$(dirname "$0")")" || die "Err: could not get absdir for '$0'"
+	[ -d "$BKB_MODULINO_MAINDIR" ] || die "Err: invalid dir for '$BKB_MODULINO_MAINDIR' for '$0'"
+	cwdutils__main "$@" && cwdutils__init && cwdutils__run "$@" || die "Abort ..."
+else
+	cwdutils__init || {
+		fail "(cwdutils__libinit): could not init"
+		return 1
+	}
+fi

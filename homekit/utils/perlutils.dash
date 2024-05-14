@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+#
+
+
+homekit=$HOME/kit/
+
+bkbutils="$homekit/BkbUtils"
+
+if ! [ -d "$bkbutils" ] ; then
+    echo "Err: no folder in '$bkbutils'" >&2
+    exit 1
+fi
+
+
+perl -I"$homekit" "$@"

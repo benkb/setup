@@ -4,7 +4,6 @@
 #
 # Shell scripts that also can be used as modules/libraries for other scripts.
 # When used as libraries this is how its done:
-# - First: set the the MODULINO=1
 #
 #
 #

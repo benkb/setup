@@ -4,7 +4,7 @@
 # perl regex urls
 # https://gist.github.com/GuillaumeLestringant/36c11afcc35c8c5b9123
 
-set -u
+set -eu
 
 prn() { printf "%s" "$*"; }
 fail() { echo "Fail: $*" >&2; }
@@ -17,48 +17,28 @@ die() {
 absdir() { (cd "${1}" && pwd -P); }
 stamp() { date +'%Y%m%d%H%M%S'; }
 
-sourcing() {
-    [ -n "${1:-}" ] && . "$1" || {
-        fail "(sourcing): cannot source file '${1:-}'"
-        return 1
-    }
-}
 
-liburl__get_url(){
+utils_liburl__get_url(){
     local item="${1:-}"
     if [ -z "$item" ]; then
         fail "no valid input '$item'"
         return 1
     fi
     if [ -f "$item" ]; then
-        liburl__get_fileurl "$item" || {
-            fail "(liburl__get_url): could not turn in file url from '$item'"
-            return 1
-        }
+        utils_liburl__get_fileurl "$item" 
     else
         case "$item" in
             'http://'*|'https://'*|'file://'*) prn "$item" ;;
             *.*)
                 local url=
                 if perl -e '$ARGV[0] =~ /^[a-zA-Z0-9\/]+\.[a-z]+$/ || exit 1' "$item"; then
-                    if url="$(liburl__get_fileurl "$item")" 2>/dev/null ; then
+                    if url="$(utils_liburl__get_fileurl "$item")" 2>/dev/null ; then
                         prn "$url"
                     else
-                        if url="$(liburl__get_web_address "$item")"; then
-                            prn "$url"
-                            return 0
-                        else
-                            fail "could not turn in web url from '$item'"
-                            return 1
-                        fi
+                        utils_liburl__get_web_address "$item"
                     fi
                 else
-                    if url="$(liburl__get_web_address "$item")"; then
-                        prn "$url"
-                    else
-                        fail "could not turn in web url from '$item'"
-                        return 1
-                    fi
+                    utils_liburl__get_web_address "$item"
                 fi
                 ;;
             *)
@@ -69,28 +49,22 @@ liburl__get_url(){
     fi
 }
 
-liburl__get_fileurl() {
+utils_liburl__get_fileurl() {
     local file="${1:-}"
     if [ -z "$file" ]; then
         fail "no valid input '$file'"
         return 1
     fi
     [ -f "$file" ] || {
-        fail "(liburl__get_fileurl): not a valid file '$file'"
+        fail "(utils_liburl__get_fileurl): not a valid file '$file'"
         return 1
     }
 
 
     local file_dir=;
-    file_dir="$(dirname "$file")" || {
-        fail "Err: could not get filedir"
-        return 1
-    }
+    file_dir="$(dirname "$file")"
     local file_dir_abs=;
-    file_dir_abs="$(absdir "$file_dir")" || {
-        fail "Err: could not get absolute filedir"
-        return 1
-    }
+    file_dir_abs="$(absdir "$file_dir")" 
 
     local filename="${file##*/}"
     local file_abspath="$file_dir_abs/$filename"
@@ -101,7 +75,7 @@ liburl__get_fileurl() {
 }
 
 
-liburl__get_domain(){
+utils_liburl__get_domain(){
     local url="${1:-}"
     if [ -z "$url" ] ; then
         fail 'url is missing'
@@ -129,7 +103,7 @@ liburl__get_domain(){
     fi
 }
 
-liburl__get_web_address(){
+utils_liburl__get_web_address(){
     local item="${1:-}"
     if [ -z "$item" ] ; then
         fail 'item is missing'
@@ -141,11 +115,9 @@ liburl__get_web_address(){
         http*|'file://'*) address="$item" ;;
         [a-zA-Z0-9]*.*)  # if the input is missing the protocol part
             local domain=
-            domain="$(liburl__get_domain "$item")" || {
-                fail 'could not run liburl__get_domain'
-                return 1
-            }
-            if liburl__urlext_big "$domain" ; then
+            domain="$(utils_liburl__get_domain "$item")" 
+
+            if utils_liburl__urlext_big "$domain" ; then
                 address="http://$item" 
             else
                 fail "(get_web_address): does not look like url '$item'"
@@ -169,7 +141,7 @@ liburl__get_web_address(){
 
 }
 
-liburl__get_title(){
+utils_liburl__get_title(){
     local url="${1:-}"
     if [ -z "$url" ] ; then
         fail 'no url'
@@ -193,14 +165,16 @@ liburl__get_title(){
     fi
 }
 
-liburl__aux_clean_string(){
+utils_liburl__aux_clean_string(){
     local string="${1:-}"
     if [ -z "$string" ] ; then
         fail 'no string'
     fi
 
     local clean_string=
-    if clean_string="$(perl -e '$ARGV[0]=~ s/[^a-zA-Z0-9-_]+/ /g; $ARGV[0] =~ s/^\s*|\s*$//g; print lc(substr( $ARGV[0], 0, 50))' "$string")"; then
+    clean_string="$(perl -e '$ARGV[0]=~ s/[^a-zA-Z0-9-_]+/ /g; $ARGV[0] =~ s/^\s*|\s*$//g; print lc(substr( $ARGV[0], 0, 50))' "$string")"
+
+    if [ -n "$clean_string" ] ; then
         prn "$clean_string"
     else
         fail "could not clean string '$string'"
@@ -209,7 +183,7 @@ liburl__aux_clean_string(){
 }
 
 
-liburl__urlext_big(){
+utils_liburl__urlext_big(){
     local domain="${1:-}"
     if [ -z "$domain" ] ; then
         fail 'no domain'
@@ -247,7 +221,7 @@ liburl__urlext_big(){
 
 
 
-liburl__filext_big(){
+utils_liburl__filext_big(){
     local file="${1:-}"
     if [ -z "$file" ] ; then
         fail 'no file'
@@ -281,13 +255,13 @@ esac
 
 
 
-#liburl__filext_big 'hello.txt' && echo yy
-#liburl__urlext_big 'hello.com' && echo yy
+#utils_liburl__filext_big 'hello.txt' && echo yy
+#utils_liburl__urlext_big 'hello.com' && echo yy
 
-#liburl__get_domain 'https://stackoverflow.com/questions/14441521/how-to-truncate-a-string-to-a-specific-length-in-perl'
+#utils_liburl__get_domain 'https://stackoverflow.com/questions/14441521/how-to-truncate-a-string-to-a-specific-length-in-perl'
 
-#liburl__get_web_address 'baba.com'
+#utils_liburl__get_web_address 'baba.com'
 
-#title="$(liburl__get_title 'https://stackoverflow.com/questions/14441521/how-to-truncate-a-string-to-a-specific-length-in-perl')"
+#title="$(utils_liburl__get_title 'https://stackoverflow.com/questions/14441521/how-to-truncate-a-string-to-a-specific-length-in-perl')"
 
-#liburl__aux_clean_string "$title"
+#utils_liburl__aux_clean_string "$title"
